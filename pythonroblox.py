@@ -154,7 +154,7 @@ def process_keyword(keyword):
             if data['UserSearchResults'] is not None:
                 for user in data['UserSearchResults']:
                     prediction, probability = predict_appropriateness(user['Blurb'], vectorizer, best_model)
-                    if prediction ==  0 and probability >  0.78:
+                    if prediction ==  0 and probability >  0.8:
                         full_url = "https://roblox.com"+ user['UserProfilePageUrl']
                         unique_urls.add(full_url)
             else:
