@@ -7,3 +7,4 @@ pip install requests
 pip install nltk
 pip install sklearn
 and do python pythonroblox.py in cmd
+you can add your own usernames to scan in keywords.txt
