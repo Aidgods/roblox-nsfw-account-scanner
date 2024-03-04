@@ -1,18 +1,22 @@
-import requests
-import requests
-import time
-import json
-from concurrent.futures import ThreadPoolExecutor
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.naive_bayes import MultinomialNB
-from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV
-from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import LabelEncoder
-import nltk
-from nltk.tokenize import word_tokenize
-from nltk.stem import WordNetLemmatizer
-from nltk.corpus import stopwords
+try:
+    import requests
+    import time
+    import json
+    from concurrent.futures import ThreadPoolExecutor
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.naive_bayes import MultinomialNB
+    from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV
+    from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import LabelEncoder
+    import nltk
+    from nltk.tokenize import word_tokenize
+    from nltk.stem import WordNetLemmatizer
+    from nltk.corpus import stopwords
+except ImportError:
+    print(ImportError)
+    print("Run 'setup.bat' to fix this error")
+
 nltk.download('punkt')
 nltk.download('averaged_perceptron_tagger')
 nltk.download('stopwords')
