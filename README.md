@@ -5,7 +5,7 @@
 open cmd(command prompt) and do these 3 commands
 
 ```
-git clone https://github.com/Aidgods/roblox-nsfw-scanner
+git clone https://github.com/Aidgods/roblox-nsfw-account-scanner
 cd roblox-nsfw-scanner
 setup.bat
 ```
