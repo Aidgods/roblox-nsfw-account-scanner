@@ -1,4 +1,4 @@
-# roblox-nsfw-scanner
+# roblox-nsfw-account-scanner
 
 ## how to install
 
