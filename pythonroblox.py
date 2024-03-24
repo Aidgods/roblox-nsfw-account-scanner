@@ -1,6 +1,7 @@
 import requests
 import time
 import json
+
 from concurrent.futures import ThreadPoolExecutor
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.naive_bayes import MultinomialNB
@@ -74,7 +75,7 @@ combined_descriptions = descriptions + descriptions2
 combined_labels = labels + labels2
 
 # Preprocess data
-vectorizer = TfidfVectorizer(ngram_range=(1, 2)) # Consider n-grams for context
+vectorizer = TfidfVectorizer(ngram_range=(1, 2), max_df=0.5)
 X = vectorizer.fit_transform(combined_descriptions)
 
 # Split combined data into training and test sets
