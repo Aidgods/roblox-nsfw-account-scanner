@@ -1,26 +1,42 @@
-try:
-    import requests
-    import time
-    import json
-    from concurrent.futures import ThreadPoolExecutor
-    from sklearn.feature_extraction.text import TfidfVectorizer
-    from sklearn.naive_bayes import MultinomialNB
-    from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV
-    from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
-    from sklearn.pipeline import Pipeline
-    from sklearn.preprocessing import LabelEncoder
-    import nltk
-    from nltk.tokenize import word_tokenize
-    from nltk.stem import WordNetLemmatizer
-    from nltk.corpus import stopwords
-except ImportError:
-    print(ImportError)
-    print("Run 'setup.bat' to fix this error")
+import requests
+import time
+import json
+from concurrent.futures import ThreadPoolExecutor
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, f1_score, precision_score, recall_score
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder
+import nltk
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
+from nltk.corpus import stopwords
+from nltk.downloader import Downloader
+from pathlib import Path
+import logging
+def check_package_exists(package_id: str, download_dir: Path) -> bool:
+    downloader = Downloader(download_dir=str(download_dir))
+    return downloader.is_installed(package_id)
 
-nltk.download('punkt')
-nltk.download('averaged_perceptron_tagger')
-nltk.download('stopwords')
-nltk.download('wordnet')
+def download_nltk_data(list_of_resources: list[str], download_dir: Path) -> None:
+    download_dir.mkdir(parents=True, exist_ok=True)
+    downloader = Downloader(download_dir=str(download_dir))
+    for resource in list_of_resources:
+        if not check_package_exists(resource, download_dir):
+            logging.debug(f'Downloading {resource} to {download_dir}')
+            downloader.download(info_or_id=resource, quiet=True)
+        else:
+            logging.debug(f'{resource} already exists in {download_dir}')
+
+# Specify the resources you want to download
+resources_to_download = ['punkt', 'averaged_perceptron_tagger', 'stopwords', 'wordnet']
+
+# Specify the directory where you want to download the resources
+download_directory = Path('./nltk_data/')
+
+# Download the resources if they are not already present
+download_nltk_data(list_of_resources=resources_to_download, download_dir=download_directory)
 original_stopwords = stopwords.words('english')
 
 # Add custom stopwords
@@ -58,14 +74,14 @@ combined_descriptions = descriptions + descriptions2
 combined_labels = labels + labels2
 
 # Preprocess data
-vectorizer = TfidfVectorizer()
+vectorizer = TfidfVectorizer(ngram_range=(1, 2)) # Consider n-grams for context
 X = vectorizer.fit_transform(combined_descriptions)
 
 # Split combined data into training and test sets
 X_train, X_test, y_train, y_test = train_test_split(X, combined_labels, test_size=0.2, random_state=42)
 
 # Hyperparameter tuning
-parameters = {'alpha': [0.1,  0.5,  1.0,  1.5,  2.0], 'fit_prior': [True, False]}
+parameters = {'alpha': [0.1, 0.5, 1.0, 1.5, 2.0], 'fit_prior': [True, False]}
 model = MultinomialNB()
 grid_search = GridSearchCV(model, parameters, scoring='accuracy', cv=5, return_train_score=True)
 grid_search.fit(X_train, y_train)
@@ -81,18 +97,22 @@ probabilities = best_model.predict_proba(X_test)
 print("Accuracy:", accuracy_score(y_test, predictions))
 
 # Cross-validation
-scores = cross_val_score(best_model, X, combined_labels, cv=5)
+scores = cross_val_score(best_model, X, combined_labels, cv=10)
 print("Cross-validation scores:", scores)
 
 # Print confusion matrix and classification report
 print("Confusion Matrix:\n", confusion_matrix(y_test, predictions))
 print("\nClassification Report:\n", classification_report(y_test, predictions))
 
+print("F1 Score:", f1_score(y_test, predictions))
+print("Precision:", precision_score(y_test, predictions))
+print("Recall:", recall_score(y_test, predictions))
+
 # Sort descriptions based on predictions
 appropriate = []
 inappropriate = []
 for description, prediction in zip(combined_descriptions, predictions):
-    if prediction ==  1:
+    if prediction == 1:
         appropriate.append(description)
     else:
         inappropriate.append(description)
@@ -107,6 +127,7 @@ with open('inappropriate.txt', 'w', encoding='utf-8') as file:
         file.write(desc + "\n")
 
 print("Descriptions have been sorted into 'appropriate.txt' and 'inappropriate.txt'.")
+
 def update_model_with_new_data(new_descriptions, new_labels, vectorizer, model):
     """
     Update the existing model with new data.
@@ -124,6 +145,7 @@ def update_model_with_new_data(new_descriptions, new_labels, vectorizer, model):
     # Re-train the model with the combined data
     X = vectorizer.fit_transform(combined_descriptions)
     model.fit(X, combined_labels)
+
 def predict_appropriateness(text, vectorizer, model):
     """
     Predict if a given text is appropriate or not.
@@ -134,7 +156,7 @@ def predict_appropriateness(text, vectorizer, model):
     - model: The trained MultinomialNB model.
 
     Returns:
-    - prediction: The model's prediction (0 for inappropriate,  1 for appropriate).
+    - prediction: The model's prediction (0 for inappropriate, 1 for appropriate).
     - probability: The probability of the prediction.
     """
     preprocessed_text = preprocess_text(text)
@@ -171,7 +193,7 @@ def process_keyword(keyword):
 with open('keywords.txt', 'r') as file:
     keywords = [line.strip() for line in file.readlines()]
 # Use ThreadPoolExecutor to process keywords in parallel
-with ThreadPoolExecutor(max_workers=40) as executor:
+with ThreadPoolExecutor(max_workers=25) as executor:
     results = executor.map(process_keyword, keywords)
 # Combine results from all keywords and remove duplicates
 all_unique_urls = set()
