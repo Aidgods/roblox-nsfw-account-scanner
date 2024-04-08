@@ -14,7 +14,7 @@ setup.bat
 ## how to run
 
 either open the `run.bat` file or do `python robloxscanner.py` in cmd in the directory
-
+btw i suggest you run this in linux or on a linux vps cuz it doesnt like it for some reason
 ---
 
 uses some shitty ai i made
