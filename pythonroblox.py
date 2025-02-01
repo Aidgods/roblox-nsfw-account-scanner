@@ -170,27 +170,46 @@ def predict_appropriateness(text, vectorizer, model):
     probabilities = model.predict_proba(X_new)
     return prediction[0], probabilities[0][prediction[0]]
 # Define the URL template
-url_template = "https://www.roblox.com/search/users/results?keyword={keyword}&maxRows=500&startIndex={startIndex}"
-search_words = ["loads", "bbc", "kids", "BB(", "â™ ï¸", "fvtas", "good time", "snow bunny", "fxmboys", "dominant", "destroyed", "daddy", "insides", "studio", "BBD", "â„ðŸ‡", "ð—¦ð—§ð—¨ð——ð—œð—¢", "TOP", "bottom", "dom", "fems", "ddy", "master", "Slants", "BWC", "c.m", "dumps", "femxboys", "kingky", "dommy"]
+# Configure the logger
+logging.basicConfig(
+    level=logging.INFO,  # Set the logging level
+    format='%(asctime)s - %(levelname)s - %(message)s',  # Define the log format
+    handlers=[
+        logging.FileHandler('app.log'),  # Log to a file
+        logging.StreamHandler()  # Log to the console
+    ]
+)
 
-# Function to process a keyword
-def process_keyword(keyword):
+# Create a logger instance
+logger = logging.getLogger(__name__)
+
+def process_keyword(keyword, max_users=10, max_pages=1):
     """
     Process a keyword and return unique URLs using the new Roblox API format.
+    
+    Args:
+        keyword (str): The keyword to search for.
+        max_users (int): Maximum number of users to process per keyword.
+        max_pages (int): Maximum number of pages to fetch per keyword.
     """
     unique_urls = set()
-    url_template = "https://users.roblox.com/v1/users/search?keyword={keyword}&limit=100"
+    url_template = "https://users.roproxy.com/v1/users/search?keyword=!{keyword}&limit=100"
     
     try:
         next_page_cursor = None
+        processed_users = 0
+        processed_pages = 0
         
-        while True:
+        while processed_pages < max_pages and processed_users < max_users:
             try:
                 # Construct the URL with the cursor for pagination
                 url = url_template.format(keyword=keyword)
                 if next_page_cursor:
                     url += f"&cursor={next_page_cursor}"
-                time.sleep(2)
+                
+                # Add a delay to avoid rate limiting
+                time.sleep(5)  # Increase the delay to 5 seconds
+                
                 response = requests.get(url)
                 
                 if response.status_code == 200:
@@ -198,11 +217,14 @@ def process_keyword(keyword):
                     
                     # Process user data
                     for user in data.get('data', []):
+                        if processed_users >= max_users:
+                            break  # Stop if we've processed enough users
+                        
                         user_id = user.get('id')
                         if user_id:
                             # Fetch user details using the user ID
-                            user_details_url = f"https://users.roblox.com/v1/users/{user_id}"
-                            time.sleep(1)
+                            user_details_url = f"https://users.roproxy.com/v1/users/{user_id}"
+                            time.sleep(3)  # Add a delay between user detail requests
                             user_details_response = requests.get(user_details_url)
                             
                             if user_details_response.status_code == 200:
@@ -214,45 +236,43 @@ def process_keyword(keyword):
                                 if prediction == 0 and probability > 0.8:
                                     full_url = f"https://www.roblox.com/users/{user_id}/profile"
                                     unique_urls.add(full_url)
+                                    processed_users += 1  # Increment the processed user count
                             else:
-                                print(f"Failed to fetch user details for user ID {user_id}: HTTP {user_details_response.status_code}")
-                    time.sleep(0.5)
+                                logger.warning(f"Failed to fetch user details for user ID {user_id}: HTTP {user_details_response.status_code}")
+                    
                     # Check for pagination
                     next_page_cursor = data.get('nextPageCursor')
                     if not next_page_cursor:
                         break
-                else:
-                    print(f"HTTP {response.status_code} for keyword={keyword}")
-                    break
                     
-                # Be nice to the API
-                time.sleep(0.5)
+                    processed_pages += 1  # Increment the processed page count
+                else:
+                    logger.warning(f"HTTP {response.status_code} for keyword={keyword}")
+                    break
                 
             except Exception as e:
-                print(f"Error processing keyword={keyword}: {e}")
+                logger.error(f"Error processing keyword={keyword}: {e}")
                 break
                 
     except Exception as e:
         logger.error(f"Error processing keyword {keyword}: {e}")
     
-    logger.info(f"Finished processing keyword: {keyword}")
+    logger.info(f"Finished processing keyword: {keyword}. Processed {processed_users} users.")
     return unique_urls
 
+# Example usage
 with open('keywords.txt', 'r') as file:
     keywords = [line.strip() for line in file.readlines()]
 
-
-with ThreadPoolExecutor(max_workers=1) as executor:
-    results = executor.map(process_keyword, keywords)
-
-
+# Process keywords with limits
 all_unique_urls = set()
-for unique_urls in results:
+for keyword in keywords:
+    unique_urls = process_keyword(keyword, max_users=100, max_pages=1)  # Adjust limits as needed
     all_unique_urls.update(unique_urls)
-    
-    
-    
+
+# Write results to file
 with open('user_urls.txt', 'w') as file:
     for url in all_unique_urls:
         file.write(url + "\n")
-print("All keywords have been processed and duplicates removed.")
+
+logger.info("All keywords have been processed and duplicates removed.")
