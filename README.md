@@ -1,4 +1,4 @@
-# roblox-nsfw-account-scanner THIS DOESNT WORK ANYMORE DUE TO API CHANGES
+# roblox-nsfw-account-scanner 
 
 ## how to install
 
