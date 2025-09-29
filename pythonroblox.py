@@ -44,11 +44,11 @@ def preprocess_text(text):
     return ' '.join(tokens + pos_features)
 
 
-with open('blurbs.txt', 'r', encoding='utf-8') as file:
-    descriptions = [preprocess_text(line.replace('\n', '')) for line in file.readlines()]
+with open('blurbs.txt', 'r', encoding='utf-8', errors='ignore') as file:
+    descriptions = [preprocess_text(line.strip()) for line in file]
 
-with open('blurbs2.txt', 'r', encoding='utf-8') as file:
-    descriptions2 = [preprocess_text(line.replace('\n', '')) for line in file.readlines()]
+with open('blurbs2.txt', 'r', encoding='utf-8', errors='ignore') as file:
+    descriptions2 = [preprocess_text(line.strip()) for line in file]
 
 
 descriptions = [desc for desc in descriptions if desc.strip()]
@@ -69,10 +69,10 @@ X = vectorizer.fit_transform(combined_descriptions)
 
 X_train, X_test, y_train, y_test = train_test_split(X, combined_labels, test_size=0.2, random_state=42)
 
-# Hyperparameter tuning
+
 parameters = {
     'model__C': [0.1, 1.0, 10.0, 100.0],  
-    'model__penalty': ['l2'],       # Regularization type
+    'model__penalty': ['l2'],       
     'model__solver': ['lbfgs'],     
     'model__max_iter': [100, 200, 500, 1000]  
 }
@@ -169,19 +169,32 @@ def predict_appropriateness(text, vectorizer, model):
     prediction = model.predict(X_new)
     probabilities = model.predict_proba(X_new)
     return prediction[0], probabilities[0][prediction[0]]
-# Define the URL template
-# Configure the logger
+
 logging.basicConfig(
-    level=logging.INFO,  # Set the logging level
-    format='%(asctime)s - %(levelname)s - %(message)s',  # Define the log format
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('app.log'),  # Log to a file
-        logging.StreamHandler()  # Log to the console
+        logging.FileHandler('app.log', encoding='utf-8'),   
+        logging.StreamHandler()
     ]
 )
 
 # Create a logger instance
 logger = logging.getLogger(__name__)
+
+# Function to load cookies from config file
+def load_cookies(config_file='config.json'):
+    import json, unicodedata
+    try:
+        with open(config_file, 'r', encoding='utf-8') as f:
+            raw = json.load(f).get("Request Cookies", {})
+        # Strip non-ASCII chars from values
+        clean = {k: unicodedata.normalize('NFKD', v).encode('ascii', 'ignore').decode()
+                 for k, v in raw.items()}
+        return clean
+    except Exception as e:
+        logger.error("Bad cookies: %s", e)
+        return {}
 
 def process_keyword(keyword, max_users=10, max_pages=1):
     """
@@ -193,7 +206,10 @@ def process_keyword(keyword, max_users=10, max_pages=1):
         max_pages (int): Maximum number of pages to fetch per keyword.
     """
     unique_urls = set()
-    url_template = "https://users.roproxy.com/v1/users/search?keyword=!{keyword}&limit=100"
+    url_template = "https://users.roblox.com/v1/users/search?keyword={keyword}&limit=100"
+    
+
+    cookies = load_cookies('config.json')
     
     try:
         next_page_cursor = None
@@ -202,50 +218,51 @@ def process_keyword(keyword, max_users=10, max_pages=1):
         
         while processed_pages < max_pages and processed_users < max_users:
             try:
-                # Construct the URL with the cursor for pagination
+
                 url = url_template.format(keyword=keyword)
                 if next_page_cursor:
                     url += f"&cursor={next_page_cursor}"
                 
-                # Add a delay to avoid rate limiting
-                time.sleep(5)  # Increase the delay to 5 seconds
+
+                time.sleep(1)  
                 
-                response = requests.get(url)
-                
+
+                response = requests.get(url, cookies=cookies)
+                print(response.json())
                 if response.status_code == 200:
                     data = response.json()
                     
-                    # Process user data
+
                     for user in data.get('data', []):
                         if processed_users >= max_users:
-                            break  # Stop if we've processed enough users
+                            break  
                         
                         user_id = user.get('id')
                         if user_id:
-                            # Fetch user details using the user ID
-                            user_details_url = f"https://users.roproxy.com/v1/users/{user_id}"
-                            time.sleep(3)  # Add a delay between user detail requests
-                            user_details_response = requests.get(user_details_url)
+
+                            user_details_url = f"https://users.roblox.com/v1/users/{user_id}"
+                            time.sleep(0.1)  
+                            user_details_response = requests.get(user_details_url, cookies=cookies)
                             
                             if user_details_response.status_code == 200:
                                 user_details = user_details_response.json()
                                 blurb = user_details.get('description', '')
-                                
+                                print("predicting")
                                 # Predict appropriateness
                                 prediction, probability = predict_appropriateness(blurb, vectorizer, best_model)
                                 if prediction == 0 and probability > 0.8:
                                     full_url = f"https://www.roblox.com/users/{user_id}/profile"
                                     unique_urls.add(full_url)
-                                    processed_users += 1  # Increment the processed user count
+                                    processed_users += 1  
                             else:
                                 logger.warning(f"Failed to fetch user details for user ID {user_id}: HTTP {user_details_response.status_code}")
                     
-                    # Check for pagination
+
                     next_page_cursor = data.get('nextPageCursor')
                     if not next_page_cursor:
                         break
                     
-                    processed_pages += 1  # Increment the processed page count
+                    processed_pages += 1  
                 else:
                     logger.warning(f"HTTP {response.status_code} for keyword={keyword}")
                     break
@@ -260,17 +277,17 @@ def process_keyword(keyword, max_users=10, max_pages=1):
     logger.info(f"Finished processing keyword: {keyword}. Processed {processed_users} users.")
     return unique_urls
 
-# Example usage
+
 with open('keywords.txt', 'r') as file:
     keywords = [line.strip() for line in file.readlines()]
 
-# Process keywords with limits
+
 all_unique_urls = set()
 for keyword in keywords:
-    unique_urls = process_keyword(keyword, max_users=100, max_pages=1)  # Adjust limits as needed
+    unique_urls = process_keyword(keyword, max_users=100, max_pages=1)  
     all_unique_urls.update(unique_urls)
 
-# Write results to file
+
 with open('user_urls.txt', 'w') as file:
     for url in all_unique_urls:
         file.write(url + "\n")
