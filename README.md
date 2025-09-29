@@ -1,5 +1,3 @@
-Sure — here's a cleaner, more professional version of the GitHub README for your project. It keeps the original spirit but improves clarity, formatting, and presentation:
-
 ---
 
 # 🕵️ Roblox NSFW Account Scanner
